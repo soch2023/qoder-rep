@@ -37,6 +37,7 @@ export function useSettings() {
         toggleVsAI: true,
         toggleAIVSAI: true,
         aiDifficulty: 1, // 0: Beginner, 1: Intermediate, 2: Master
+        boardOrientation: 'white',
       };
     },
   });
@@ -71,6 +72,7 @@ export function useSettings() {
       toggleVsAI: true,
       toggleAIVSAI: true,
       aiDifficulty: 1,
+      boardOrientation: 'white',
     },
     isLoading: query.isLoading,
     updateSettings: mutation.mutate,

@@ -152,7 +152,7 @@ export default function Home() {
                 customDarkSquareStyle={{ backgroundColor: "#779556" }}
                 customLightSquareStyle={{ backgroundColor: "#ebecd0" }}
                 animationDuration={200}
-                boardOrientation={game.turn() === 'b' && settings.toggleAIVSAI ? 'black' : 'white'}
+                boardOrientation={settings.boardOrientation || 'white'}
               />
             </div>
           </div>

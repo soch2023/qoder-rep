@@ -1,19 +1,26 @@
 import { Link, useLocation } from "wouter";
-import { Crown, Settings, BarChart2, BookOpen } from "lucide-react";
+import { Crown, Settings, BarChart2, BookOpen, RotateCw } from "lucide-react";
 import { useSettings } from "@/hooks/use-settings";
 
 export function Header() {
   const [location] = useLocation();
   const { settings, updateSettings } = useSettings();
 
-  const handleToggle = (key: keyof typeof settings) => {
-    const currentVal = settings[key];
+  const handleToggle = (key: string) => {
+    const currentVal = (settings as any)[key];
     if (typeof currentVal === 'boolean') {
       updateSettings({
         ...settings,
         [key]: !currentVal,
       });
     }
+  };
+
+  const toggleOrientation = () => {
+    updateSettings({
+      ...settings,
+      boardOrientation: settings.boardOrientation === 'white' ? 'black' : 'white'
+    });
   };
 
   return (
@@ -47,7 +54,7 @@ export function Header() {
 
       <div className="flex items-center gap-4 w-full md:w-auto justify-end">
         {/* Global Toggles */}
-          <div className="flex items-center gap-2 bg-secondary/50 p-1.5 rounded-full border border-white/5">
+        <div className="flex items-center gap-2 bg-secondary/50 p-1.5 rounded-full border border-white/5">
           <ToggleBtn 
             active={settings.toggleLocalTwoPlayer} 
             onClick={() => handleToggle('toggleLocalTwoPlayer')}
@@ -66,6 +73,17 @@ export function Header() {
             label="机器自战"
             icon={<BookOpen className="w-3 h-3" />}
           />
+          
+          <div className="w-px h-6 bg-white/10 mx-1" />
+          
+          <button
+            onClick={toggleOrientation}
+            className="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 bg-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"
+            title="翻转棋盘"
+          >
+            <RotateCw className="w-3 h-3" />
+            翻转
+          </button>
         </div>
       </div>
     </header>

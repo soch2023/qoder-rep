@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 interface ExplorerMove {
   uci: string;
@@ -35,5 +35,6 @@ export function useOpeningExplorer(fen: string) {
     },
     enabled: !!fen,
     staleTime: Infinity, // Opening stats don't change often
+    placeholderData: keepPreviousData,
   });
 }

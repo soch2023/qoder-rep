@@ -3,36 +3,53 @@ import { Loader2, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function OpeningTree({ fen, onMoveSelect }: { fen: string, onMoveSelect: (move: string) => void }) {
-  const { data, isLoading, error } = useOpeningExplorer(fen);
+  const { data, isLoading, isPlaceholderData, error } = useOpeningExplorer(fen);
 
-  if (isLoading) {
+  // Use a constant height container to avoid jumping
+  const containerStyle = "flex flex-col h-full bg-card/30 rounded-xl overflow-hidden relative";
+
+  if (error) {
     return (
-      <div className="flex items-center justify-center h-48 text-muted-foreground">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" />
-        加载中...
+      <div className={containerStyle}>
+        <div className="p-4 text-center text-sm text-muted-foreground mt-12">
+          未找到此局面的大师对局。
+        </div>
       </div>
     );
   }
 
-  if (error || !data) {
+  // Show loader only on initial load, not when updating moves
+  if (isLoading && !isPlaceholderData) {
     return (
-      <div className="p-4 text-center text-sm text-muted-foreground">
-        未找到此局面的大师对局。
+      <div className={containerStyle}>
+        <div className="flex items-center justify-center h-full text-muted-foreground">
+          <Loader2 className="w-6 h-6 animate-spin mr-2" />
+          正在加载开局库...
+        </div>
       </div>
     );
   }
+
+  if (!data) return null;
 
   const totalGames = data.white + data.draws + data.black;
 
   return (
-    <div className="flex flex-col h-full bg-card/30 rounded-xl overflow-hidden">
-      <div className="p-3 border-b border-white/5 bg-white/5 flex justify-between items-center">
+    <div className={containerStyle}>
+      {/* Loading overlay when fetching new moves */}
+      {isPlaceholderData && (
+        <div className="absolute inset-0 bg-background/20 backdrop-blur-[1px] z-20 flex items-center justify-center">
+          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+        </div>
+      )}
+
+      <div className="p-3 border-b border-white/5 bg-white/5 flex justify-between items-center shrink-0">
         <h3 className="text-sm font-semibold text-foreground">开局库</h3>
         <span className="text-xs text-muted-foreground">{totalGames.toLocaleString()} 局大师对局</span>
       </div>
       
       <ScrollArea className="flex-1">
-        <div className="flex flex-col">
+        <div className={`flex flex-col transition-opacity duration-200 ${isPlaceholderData ? 'opacity-50' : 'opacity-100'}`}>
           {data.moves.slice(0, 10).map((move) => {
             const moveTotal = move.white + move.draws + move.black;
             const winRate = ((move.white + move.draws / 2) / moveTotal * 100).toFixed(1);

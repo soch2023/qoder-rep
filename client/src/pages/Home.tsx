@@ -83,10 +83,27 @@ export default function Home() {
     try {
       setGame(prev => {
         const next = new Chess(prev.fen());
-        const result = next.move(move);
-        if (result) {
+        // For string moves (UCI from Stockfish), we need to validate and potentially handle promotion
+        let moveResult;
+        if (typeof move === 'string' && move.length >= 4) {
+          const from = move.slice(0, 2);
+          const to = move.slice(2, 4);
+          const promotion = move.length === 5 ? move[4] : undefined;
+          
+          // Verify if it's a legal move
+          const legalMoves = next.moves({ verbose: true });
+          const isLegal = legalMoves.some(m => m.from === from && m.to === to);
+          
+          if (isLegal) {
+            moveResult = next.move({ from, to, promotion: promotion || 'q' });
+          }
+        } else {
+          moveResult = next.move(move);
+        }
+
+        if (moveResult) {
           setFen(next.fen());
-          setMoveHistory(h => [...h, result.san]);
+          setMoveHistory(h => [...h, moveResult.san]);
           return next;
         }
         return prev;

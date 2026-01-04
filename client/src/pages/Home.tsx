@@ -293,21 +293,42 @@ export default function Home() {
             </h2>
             
             {settings.gameMode === 'vsAI' && (
-              <div className="mt-4">
-                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">引擎难度</label>
-                 <Select 
-                   value={settings.aiDifficulty.toString()} 
-                   onValueChange={(v) => updateSettings({ ...settings, aiDifficulty: parseInt(v) })}
-                 >
-                    <SelectTrigger className="w-full bg-background border-white/10">
-                      <SelectValue placeholder="选择难度" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DIFFICULTY_LEVELS.map(level => (
-                        <SelectItem key={level.value} value={level.value}>{level.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                 </Select>
+              <div className="mt-4 space-y-4">
+                 <div>
+                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">玩家执色</label>
+                   <div className="flex gap-2 p-1 bg-background/50 rounded-lg border border-white/10">
+                     <Button 
+                       variant={settings.boardOrientation === 'white' ? 'default' : 'ghost'} 
+                       className="flex-1 h-8 text-xs"
+                       onClick={() => updateSettings({ ...settings, boardOrientation: 'white' })}
+                     >
+                       执白
+                     </Button>
+                     <Button 
+                       variant={settings.boardOrientation === 'black' ? 'default' : 'ghost'} 
+                       className="flex-1 h-8 text-xs"
+                       onClick={() => updateSettings({ ...settings, boardOrientation: 'black' })}
+                     >
+                       执黑
+                     </Button>
+                   </div>
+                 </div>
+                 <div>
+                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">引擎难度</label>
+                   <Select 
+                     value={settings.aiDifficulty.toString()} 
+                     onValueChange={(v) => updateSettings({ ...settings, aiDifficulty: parseInt(v) })}
+                   >
+                      <SelectTrigger className="w-full bg-background border-white/10">
+                        <SelectValue placeholder="选择难度" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DIFFICULTY_LEVELS.map(level => (
+                          <SelectItem key={level.value} value={level.value}>{level.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                   </Select>
+                 </div>
               </div>
             )}
           </div>

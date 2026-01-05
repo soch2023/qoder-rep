@@ -97,28 +97,37 @@ export default function Home() {
   function safeMove(move: string | { from: string; to: string; promotion?: string }) {
     try {
       setGame(prev => {
+        // 防止对局已结束或状态异常时继续走棋
+        if (prev.isGameOver()) return prev;
+
         const next = new Chess(prev.fen());
-        // For string moves (UCI from Stockfish), we need to handle it
         let moveResult;
-        if (typeof move === 'string' && move.length >= 4) {
-          const from = move.slice(0, 2);
-          const to = move.slice(2, 4);
-          const promotion = move.length === 5 ? move[4] : 'q';
-          moveResult = next.move({ from, to, promotion });
-        } else {
-          moveResult = next.move(move);
+        
+        try {
+          if (typeof move === 'string' && move.length >= 4) {
+            const from = move.slice(0, 2);
+            const to = move.slice(2, 4);
+            const promotion = move.length === 5 ? move[4] : 'q';
+            moveResult = next.move({ from, to, promotion });
+          } else {
+            moveResult = next.move(move);
+          }
+        } catch (err) {
+          console.warn("Chess.js move validation error:", err);
+          return prev;
         }
 
         if (moveResult) {
           const newFen = next.fen();
-          setFen(newFen);
+          // 使用 setTimeout 确保 FEN 更新在下一帧触发，避免渲染竞争
+          setTimeout(() => setFen(newFen), 0);
           setMoveHistory(h => [...h, moveResult.san]);
           return next;
         }
         return prev;
       });
     } catch (e) {
-      console.warn("Invalid move attempted", move);
+      console.warn("safeMove outer error:", e);
     }
   }
 

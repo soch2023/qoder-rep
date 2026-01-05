@@ -52,7 +52,7 @@ export default function Home() {
 
   // AI Logic
   const isPlayerTurn = settings.gameMode === 'vsAI' 
-    ? game.turn() === (settings.boardOrientation === 'white' ? 'w' : 'b')
+    ? game.turn() === settings.playerColor
     : true;
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export default function Home() {
         makeAiMove();
       }
     }
-  }, [fen, settings.gameMode, settings.aiDifficulty, settings.whiteAIDifficulty, settings.blackAIDifficulty, settings.boardOrientation, aiVsAiActive, isPlayerTurn]);
+  }, [fen, settings.gameMode, settings.aiDifficulty, settings.whiteAIDifficulty, settings.blackAIDifficulty, settings.playerColor, aiVsAiActive, isPlayerTurn]);
 
   function safeMove(move: string | { from: string; to: string; promotion?: string }) {
     try {
@@ -124,7 +124,7 @@ export default function Home() {
     if (aiVsAiActive) return false;
 
     // Block if it's AI's turn in PvAI mode
-    if (settings.gameMode === 'vsAI' && game.turn() === 'b') return false;
+    if (settings.gameMode === 'vsAI' && game.turn() !== settings.playerColor) return false;
 
     try {
       const move = {
@@ -166,15 +166,30 @@ export default function Home() {
       <main className="flex-1 flex flex-col lg:flex-row h-screen lg:h-[calc(100vh-64px)] overflow-y-auto lg:overflow-hidden">
         
         {/* LEFT: Game Board Area */}
-        <div className="w-full lg:flex-1 flex flex-col items-center justify-center p-4 lg:p-8 bg-gradient-to-b from-background to-secondary/20 relative min-h-[500px] lg:min-h-0">
-          
-          {/* Status Indicators */}
-          <div className="absolute top-4 left-4 lg:left-8 flex gap-4 z-20">
-             <div className="flex items-center gap-2 px-4 py-2 bg-card rounded-full border border-white/5 text-[10px] lg:text-xs font-mono">
-               <div className={`w-2 h-2 rounded-full ${isReady ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
-               STOCKFISH 10
-             </div>
-          </div>
+          <div className="flex-1 flex items-center justify-center p-4 lg:p-8 bg-gradient-to-b from-background to-secondary/20 relative min-h-[500px] lg:min-h-0">
+            {/* 翻转棋盘按钮 (通用) */}
+            <div className="absolute top-4 right-4 lg:right-8 z-20">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => updateSettings({
+                  ...settings,
+                  boardOrientation: settings.boardOrientation === 'white' ? 'black' : 'white'
+                })}
+                title="翻转棋盘"
+                className="rounded-full bg-card/80 backdrop-blur-sm"
+              >
+                <RotateCw className="w-5 h-5" />
+              </Button>
+            </div>
+
+            {/* Status Indicators */}
+            <div className="absolute top-4 left-4 lg:left-8 flex gap-4 z-20">
+               <div className="flex items-center gap-2 px-4 py-2 bg-card rounded-full border border-white/5 text-[10px] lg:text-xs font-mono">
+                 <div className={`w-2 h-2 rounded-full ${isReady ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
+                 STOCKFISH 10
+               </div>
+            </div>
 
           <div className="flex gap-2 lg:gap-4 items-stretch h-auto w-full max-w-[600px] aspect-square touch-none overscroll-none py-1">
             {/* 评估条 (Eval Bar) */}
@@ -266,18 +281,6 @@ export default function Home() {
                      {settings.gameMode === 'vsAI' ? <Cpu className="w-4 h-4" /> : <Users className="w-4 h-4" />}
                      <span>{settings.gameMode === 'vsAI' ? "人机对弈中" : "本地对战模式"}</span>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => updateSettings({
-                      ...settings,
-                      boardOrientation: settings.boardOrientation === 'white' ? 'black' : 'white'
-                    })}
-                    title="翻转棋盘"
-                    className="hover-elevate"
-                  >
-                    <RotateCw className="w-5 h-5" />
-                  </Button>
                 </div>
              )}
 
@@ -305,10 +308,10 @@ export default function Home() {
                        size="sm" 
                        className="h-7 text-[10px] px-2"
                        onClick={() => {
-                         const currentOrientation = settings.boardOrientation;
+                         const currentType = settings.playerColor;
                          updateSettings({ 
                            ...settings, 
-                           boardOrientation: currentOrientation === 'white' ? 'black' : 'white' 
+                           playerColor: currentType === 'w' ? 'b' : 'w' 
                          });
                        }}
                      >
@@ -317,16 +320,16 @@ export default function Home() {
                    </div>
                    <div className="flex gap-2 p-1 bg-background/50 rounded-lg border border-white/10">
                      <Button 
-                       variant={settings.boardOrientation === 'white' ? 'default' : 'ghost'} 
+                       variant={settings.playerColor === 'w' ? 'default' : 'ghost'} 
                        className="flex-1 h-8 text-xs"
-                       onClick={() => updateSettings({ ...settings, boardOrientation: 'white' })}
+                       onClick={() => updateSettings({ ...settings, playerColor: 'w' })}
                      >
                        执白
                      </Button>
                      <Button 
-                       variant={settings.boardOrientation === 'black' ? 'default' : 'ghost'} 
+                       variant={settings.playerColor === 'b' ? 'default' : 'ghost'} 
                        className="flex-1 h-8 text-xs"
-                       onClick={() => updateSettings({ ...settings, boardOrientation: 'black' })}
+                       onClick={() => updateSettings({ ...settings, playerColor: 'b' })}
                      >
                        执黑
                      </Button>

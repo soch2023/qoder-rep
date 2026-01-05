@@ -39,6 +39,7 @@ export function useSettings() {
           boardOrientation: 'white',
           whiteAIDifficulty: 1,
           blackAIDifficulty: 2,
+          playerColor: 'w',
         }
       };
     },
@@ -75,6 +76,7 @@ export function useSettings() {
       boardOrientation: 'white',
       whiteAIDifficulty: 1,
       blackAIDifficulty: 2,
+      playerColor: 'w',
     },
     isLoading: query.isLoading,
     updateSettings: mutation.mutate,

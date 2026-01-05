@@ -12,6 +12,7 @@ export const userSettings = pgTable("user_settings", {
     boardOrientation?: 'white' | 'black';
     whiteAIDifficulty?: number;
     blackAIDifficulty?: number;
+    playerColor?: 'w' | 'b';
   }>().notNull(),
 });
 

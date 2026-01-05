@@ -217,11 +217,36 @@ export default function Home() {
                 variant="ghost" 
                 className="flex gap-2"
                 onClick={() => {
-                  const newGame = new Chess(game.fen());
-                  newGame.undo();
-                  setGame(newGame);
-                  setFen(newGame.fen());
-                  setMoveHistory(h => h.slice(0, -1));
+                  const newGame = new Chess();
+                  // Reconstruct from current history to ensure undo works correctly
+                  const moves = game.history();
+                  moves.pop();
+                  
+                  // Replay all moves to get the penultimate state
+                  for (const move of moves) {
+                    newGame.move(move);
+                  }
+                  
+                  // If we're in vsAI mode and it's the AI's turn after undoing,
+                  // we should undo once more to get back to the player's last move
+                  if (settings.gameMode === 'vsAI' && newGame.turn() !== settings.playerColor && moves.length > 0) {
+                    moves.pop();
+                    const playerGame = new Chess();
+                    for (const move of moves) {
+                      playerGame.move(move);
+                    }
+                    const finalFen = playerGame.fen();
+                    setGame(playerGame);
+                    setFen(finalFen);
+                    setMoveHistory(h => h.slice(0, -2));
+                  } else {
+                    const finalFen = newGame.fen();
+                    setGame(newGame);
+                    setFen(finalFen);
+                    setMoveHistory(h => h.slice(0, -1));
+                  }
+                  // Force Stockfish to stop any current analysis of the undone state
+                  stop();
                 }}
                 disabled={aiVsAiActive || moveHistory.length === 0}
              >

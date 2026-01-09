@@ -32,21 +32,48 @@ export default function Home() {
   
   // AI vs AI State
   const [aiVsAiActive, setAiVsAiActive] = useState(false);
+  const [isAIThinking, setIsAIThinking] = useState(false);
   const aiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Validations
   const [validated, setValidated] = useState(false);
 
-  // Analysis Effect
+  // Analysis Effect with debounce
   useEffect(() => {
-    analyze(fen);
+    const timer = setTimeout(() => {
+      if (fen) {
+        analyze(fen);
+      }
+    }, 300); // 300ms防抖
+    
+    return () => clearTimeout(timer);
   }, [fen, analyze]);
 
   // Handle Game Over
   useEffect(() => {
     if (game.isGameOver()) {
       setAiVsAiActive(false);
-      // Could show result modal here
+      
+      // 显示游戏结果
+      let resultText = "游戏结束";
+      if (game.isCheckmate()) {
+        const winner = game.turn() === 'w' ? '黑方' : '白方';
+        resultText = `将杀！${winner}获胜！`;
+      } else if (game.isDraw()) {
+        resultText = "平局";
+        if (game.isStalemate()) {
+          resultText = "逼和";
+        } else if (game.isThreefoldRepetition()) {
+          resultText = "三次重复局面";
+        } else if (game.isInsufficientMaterial()) {
+          resultText = "双方子力均不足以将杀";
+        }
+      } else if (game.isCheck()) {
+        resultText = "将军";
+      }
+      
+      // 可以在这里显示结果对话框或通知
+      console.log(resultText); // 临时输出结果
     }
   }, [game]);
 
@@ -59,9 +86,13 @@ export default function Home() {
     // 1. AI vs AI Mode
     if (settings.gameMode === 'aiVsAi' && aiVsAiActive && !game.isGameOver()) {
       const makeAiMove = async () => {
+        setIsAIThinking(true);
         await new Promise(r => setTimeout(r, 500));
         // 确保模式和活动状态未改变
-        if (!aiVsAiActive || settings.gameMode !== 'aiVsAi' || game.isGameOver()) return; 
+        if (!aiVsAiActive || settings.gameMode !== 'aiVsAi' || game.isGameOver()) {
+          setIsAIThinking(false);
+          return; 
+        }
         
         const currentTurn = game.turn();
         const difficulty = currentTurn === 'w' 
@@ -72,16 +103,21 @@ export default function Home() {
         if (bestMove && settings.gameMode === 'aiVsAi' && aiVsAiActive) {
           safeMove(bestMove);
         }
+        setIsAIThinking(false);
       };
       makeAiMove();
     } 
     // 2. Player vs AI Mode
     else if (settings.gameMode === 'vsAI' && !game.isGameOver() && !isPlayerTurn) {
       const makeAiMove = async () => {
+        setIsAIThinking(true);
         await new Promise(r => setTimeout(r, 600)); // 稍长一点的延迟，给悔棋留足制动时间
         
         // 关键防护：确保现在依然是AI回合，且模式没变
-        if (settings.gameMode !== 'vsAI' || game.turn() === settings.playerColor || game.isGameOver()) return;
+        if (settings.gameMode !== 'vsAI' || game.turn() === settings.playerColor || game.isGameOver()) {
+          setIsAIThinking(false);
+          return;
+        }
         
         const bestMove = await getBestMove(game.fen(), settings.aiDifficulty);
         
@@ -89,6 +125,7 @@ export default function Home() {
         if (bestMove && settings.gameMode === 'vsAI' && game.turn() !== settings.playerColor) {
           safeMove(bestMove);
         }
+        setIsAIThinking(false);
       };
       makeAiMove();
     }
@@ -119,6 +156,13 @@ export default function Home() {
 
         if (moveResult) {
           const newFen = next.fen();
+          // 验证新FEN是否有效
+          try {
+            new Chess(newFen); // 尝试创建新游戏实例以验证FEN
+          } catch (validationErr) {
+            console.error("Invalid FEN generated:", newFen, validationErr);
+            return prev; // 如果生成的FEN无效，则返回之前的状态
+          }
           // 使用 setTimeout 确保 FEN 更新在下一帧触发，避免渲染竞争
           setTimeout(() => setFen(newFen), 0);
           setMoveHistory(h => [...h, moveResult.san]);
@@ -228,43 +272,53 @@ export default function Home() {
                   const history = [...moveHistory];
                   history.pop(); // 移除最后一步
                   
-                  // 创建新游戏并从标准起始位开始推演
-                  const newGame = new Chess();
-                  let success = true;
-                  
-                  for (const m of history) {
-                    try {
-                      const result = newGame.move(m);
-                      if (!result) {
-                        console.error("Invalid move in history:", m);
+                  try {
+                    // 创建新游戏并从标准起始位开始推演
+                    const newGame = new Chess();
+                    let success = true;
+                    
+                    for (const m of history) {
+                      try {
+                        const result = newGame.move(m);
+                        if (!result) {
+                          console.error("Invalid move in history:", m);
+                          success = false;
+                          break;
+                        }
+                      } catch (err) {
+                        console.error("Reconstruction error at move:", m, err);
                         success = false;
                         break;
                       }
-                    } catch (err) {
-                      console.error("Reconstruction error at move:", m, err);
-                      success = false;
-                      break;
+                    }
+                    
+                    if (success) {
+                      const newFen = newGame.fen();
+                      // 先更新基础状态
+                      setMoveHistory(history);
+                      setFen(newFen);
+                      setGame(newGame);
+                    } else {
+                      // 如果历史记录推演失败，作为保底方案：使用 chess.js 自带的 undo
+                      // 虽然可能不如历史推演精准，但能防止崩溃
+                      const rollbackGame = new Chess(game.fen());
+                      if (rollbackGame.history().length > 0) {
+                        rollbackGame.undo();
+                        const rollbackFen = rollbackGame.fen();
+                        setGame(rollbackGame);
+                        setFen(rollbackFen);
+                        setMoveHistory(h => h.slice(0, -1));
+                      }
+                    }
+                  } catch (error) {
+                    console.error("Undo operation failed:", error);
+                    // 最后的保底方案：重置到上一步
+                    if (moveHistory.length > 0) {
+                      setMoveHistory(h => h.slice(0, -1));
                     }
                   }
-                  
-                  if (success) {
-                    const newFen = newGame.fen();
-                    // 先更新基础状态
-                    setMoveHistory(history);
-                    setFen(newFen);
-                    setGame(newGame);
-                  } else {
-                    // 如果历史记录推演失败，作为保底方案：使用 chess.js 自带的 undo
-                    // 虽然可能不如历史推演精准，但能防止崩溃
-                    const rollbackGame = new Chess(game.fen());
-                    rollbackGame.undo();
-                    const rollbackFen = rollbackGame.fen();
-                    setGame(rollbackGame);
-                    setFen(rollbackFen);
-                    setMoveHistory(h => h.slice(0, -1));
-                  }
                 }}
-                disabled={aiVsAiActive || moveHistory.length === 0}
+                disabled={aiVsAiActive || isAIThinking || moveHistory.length === 0}
              >
                 <RotateCcw className="w-5 h-5" />
                 <span className="hidden sm:inline">悔棋回退</span>
@@ -407,7 +461,7 @@ export default function Home() {
              <div className="bg-background/50 p-3 rounded-lg border border-white/5">
                 <span className="text-xs text-muted-foreground block mb-1">引擎推荐</span>
                 <span className="font-mono font-bold text-lg text-primary">
-                   {evaluation.bestMove || "-"}
+                   {isAIThinking ? "思考中..." : evaluation.bestMove || "-"}
                 </span>
              </div>
           </div>

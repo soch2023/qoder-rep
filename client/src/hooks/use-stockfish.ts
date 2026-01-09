@@ -60,7 +60,10 @@ export function useStockfish() {
       worker.postMessage('uci');
 
       return () => {
-        worker.terminate();
+        if (workerRef.current) {
+          workerRef.current.terminate();
+          workerRef.current = null;
+        }
       };
     } catch (err) {
       setError(new ChessAppError(

@@ -26,12 +26,36 @@ export function useOpeningExplorer(fen: string) {
     queryFn: async () => {
       // Normalize FEN for URL (replace spaces)
       const encodedFen = encodeURIComponent(fen);
-      const res = await fetch(`https://explorer.lichess.ovh/masters?fen=${encodedFen}`);
-      if (!res.ok) {
-        throw new Error("Failed to fetch opening stats");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+      
+      try {
+        const res = await fetch(`https://explorer.lichess.ovh/masters?fen=${encodedFen}`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) {
+          // 根据状态码提供更详细的错误信息
+          if (res.status === 429) {
+            throw new Error("Rate limit exceeded - please try again later");
+          } else if (res.status === 404) {
+            // 404表示没有找到该位置的统计数据，这不是错误，而是正常情况
+            return { white: 0, draws: 0, black: 0, moves: [], topGames: [] };
+          } else {
+            throw new Error(`Failed to fetch opening stats: ${res.status} ${res.statusText}`);
+          }
+        }
+        
+        const data = await res.json();
+        return data as ExplorerResponse;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error('Opening explorer request timed out');
+        }
+        throw error;
       }
-      const data = await res.json();
-      return data as ExplorerResponse;
     },
     enabled: !!fen,
     staleTime: Infinity, // Opening stats don't change often

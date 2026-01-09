@@ -279,6 +279,11 @@ export default function Home() {
           animationDuration={0}
           boardOrientation={settings.boardOrientation || 'white'}
           areArrowsAllowed={false}
+          customBoardStyle={{
+            boxShadow: '0 10px 20px rgba(0, 0, 0, 0.2)',
+            borderRadius: '4px',
+            margin: 'auto'
+          }}
         />
       </div>
           </div>
@@ -337,8 +342,9 @@ export default function Home() {
                       // 如果历史记录推演失败，作为保底方案：使用 chess.js 自带的 undo
                       // 虽然可能不如历史推演精准，但能防止崩溃
                       const rollbackGame = new Chess(game.fen());
-                      if (rollbackGame.history().length > 0) {
-                        const lastMoveFromGame = rollbackGame.history().pop(); // 获取最后一步棋
+                      const gameHistory = rollbackGame.history();
+                      if (gameHistory.length > 0) {
+                        const lastMoveFromGame = gameHistory[gameHistory.length - 1]; // 获取最后一步棋
                         rollbackGame.undo();
                         const rollbackFen = rollbackGame.fen();
                         setGame(rollbackGame);
@@ -362,10 +368,12 @@ export default function Home() {
                     // 最后的保底方案：重置到上一步
                     if (moveHistory.length > 0) {
                       setMoveHistory(h => h.slice(0, -1));
+                      // 同样需要把这一步加入前进历史
+                      setForwardHistory(prev => [...prev, moveHistory[moveHistory.length - 1]]);
                     }
                   }
                 }}
-                disabled={aiVsAiActive || isAIThinking || moveHistory.length === 0}
+                disabled={aiVsAiActive || (settings.gameMode === 'vsAI' && isAIThinking) || moveHistory.length === 0}
              >
                 <RotateCcw className="w-5 h-5" />
                 <span className="hidden sm:inline">悔棋回退</span>
@@ -408,6 +416,8 @@ export default function Home() {
                     }
                   } catch (error) {
                     console.error("Redo operation failed:", error);
+                    // 尝试从前进历史中移除已处理的棋步，即使执行失败
+                    setForwardHistory(prev => prev.slice(1));
                   }
                 }}
                 disabled={aiVsAiActive || isAIThinking || forwardHistory.length === 0}
@@ -418,78 +428,52 @@ export default function Home() {
 
              <div className="h-8 w-px bg-white/10 mx-2" />
 
-             {settings.gameMode === 'aiVsAi' ? (
-                <div className="flex flex-col items-center gap-2">
-                  <div className="flex gap-4 mb-2">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold">白方 (AI)</span>
-                      <Select 
-                        value={(settings.whiteAIDifficulty ?? 1).toString()} 
-                        onValueChange={(v) => updateSettings({ ...settings, whiteAIDifficulty: parseInt(v) })}
-                      >
-                         <SelectTrigger className="h-7 w-24 bg-background text-[10px]">
-                           <SelectValue />
-                         </SelectTrigger>
-                         <SelectContent>
-                           {DIFFICULTY_LEVELS.map(level => (
-                             <SelectItem key={level.value} value={level.value}>{level.label.split(' ')[0]}</SelectItem>
-                           ))}
-                         </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold">黑方 (AI)</span>
-                      <Select 
-                        value={(settings.blackAIDifficulty ?? 2).toString()} 
-                        onValueChange={(v) => updateSettings({ ...settings, blackAIDifficulty: parseInt(v) })}
-                      >
-                         <SelectTrigger className="h-7 w-24 bg-background text-[10px]">
-                           <SelectValue />
-                         </SelectTrigger>
-                         <SelectContent>
-                           {DIFFICULTY_LEVELS.map(level => (
-                             <SelectItem key={level.value} value={level.value}>{level.label.split(' ')[0]}</SelectItem>
-                           ))}
-                         </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <Button 
-                    onClick={() => setAiVsAiActive(!aiVsAiActive)}
-                    className={aiVsAiActive ? "bg-red-500/10 text-red-500 hover:bg-red-500/20" : "bg-green-500/10 text-green-500 hover:bg-green-500/20"}
-                  >
-                    {aiVsAiActive ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-                    {aiVsAiActive ? "暂停演示" : "开始自战演示"}
-                  </Button>
-                </div>
-             ) : (
-                <div className="flex items-center gap-4">
-                  {settings.gameMode === 'vsAI' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsAIPaused(!isAIPaused)}
-                      className="flex items-center gap-2"
-                    >
-                      {isAIPaused ? (
-                        <>
-                          <Play className="w-4 h-4" />
-                          <span>恢复AI</span>
-                        </>
-                      ) : (
-                        <>
-                          <Pause className="w-4 h-4" />
-                          <span>暂停AI</span>
-                        </>
-                      )}
-                    </Button>
-                  )}
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground px-4">
-                     {settings.gameMode === 'vsAI' ? <Cpu className="w-4 h-4" /> : <Users className="w-4 h-4" />}
-                     <span>{settings.gameMode === 'vsAI' ? (isAIPaused ? "AI已暂停" : "人机对弈中") : "本地对战模式"}</span>
-                  </div>
-                </div>
-             )}
+             <div className="flex items-center gap-4">
+               {settings.gameMode === 'aiVsAi' && (
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   onClick={() => setAiVsAiActive(!aiVsAiActive)}
+                   className="flex items-center gap-2"
+                 >
+                   {aiVsAiActive ? (
+                     <>
+                       <Play className="w-4 h-4" />
+                       <span>恢复AI</span>
+                     </>
+                   ) : (
+                     <>
+                       <Pause className="w-4 h-4" />
+                       <span>暂停AI</span>
+                     </>
+                   )}
+                 </Button>
+               )}
+               {settings.gameMode === 'vsAI' && (
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   onClick={() => setIsAIPaused(!isAIPaused)}
+                   className="flex items-center gap-2"
+                 >
+                   {isAIPaused ? (
+                     <>
+                       <Play className="w-4 h-4" />
+                       <span>恢复AI</span>
+                     </>
+                   ) : (
+                     <>
+                       <Pause className="w-4 h-4" />
+                       <span>暂停AI</span>
+                     </>
+                   )}
+                 </Button>
+               )}
+               <div className="flex items-center gap-2 text-sm text-muted-foreground px-4">
+                  {settings.gameMode === 'vsAI' ? <Cpu className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                  <span>{settings.gameMode === 'vsAI' ? (isAIPaused ? "AI已暂停" : "人机对弈中") : settings.gameMode === 'aiVsAi' ? (aiVsAiActive ? "AI对战中" : "AI已暂停") : "本地对战模式"}</span>
+               </div>
+             </div>
 
              <Button variant="secondary" onClick={resetGame}>重新开始</Button>
           </div>
@@ -578,13 +562,8 @@ export default function Home() {
              </div>
           </div>
 
-          {/* Opening Explorer */}
-          <div className="flex-1 overflow-hidden p-4">
-            <OpeningTree fen={fen} onMoveSelect={(san) => safeMove(san)} />
-          </div>
-
           {/* 历史记录 */}
-          <div className="h-48 border-t border-white/5 p-4 bg-background/30 overflow-y-auto">
+          <div className="h-48 border-b border-white/5 p-4 bg-background/30 overflow-y-auto">
              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">着法记录</h3>
              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm font-mono">
                 {moveHistory.map((move, i) => {
@@ -600,6 +579,11 @@ export default function Home() {
                   return null;
                 })}
              </div>
+          </div>
+          
+          {/* Opening Explorer */}
+          <div className="flex-1 overflow-hidden p-4">
+            <OpeningTree fen={fen} onMoveSelect={(san) => safeMove(san)} />
           </div>
 
         </div>

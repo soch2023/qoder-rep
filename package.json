@@ -8,7 +8,11 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:init": "node -e \"import { Pool } from 'pg'; const pool = new Pool({connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }}); pool.query('DROP TABLE IF EXISTS user_settings; CREATE TABLE user_settings (id SERIAL PRIMARY KEY, session_id TEXT NOT NULL UNIQUE, preferences JSONB NOT NULL)', (err)=>{if(err) console.error('建表失败:', err); else console.log('✅ user_settings表 创建/更新成功！'); pool.end();})\"",
+    "db:safe-init": "node -e \"import { Pool } from 'pg'; const pool = new Pool({connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }}); pool.query('CREATE TABLE IF NOT EXISTS user_settings (id SERIAL PRIMARY KEY, session_id TEXT NOT NULL UNIQUE, preferences JSONB NOT NULL)', (err)=>{if(err) console.error('建表失败:', err); else console.log('✅ user_settings表 检测/创建成功（安全模式，不删表）'); pool.end();})\"",
+    "prestart": "npm run db:safe-init",
+    "deploy": "npm install && npm run build && npm run db:safe-init && npm run start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

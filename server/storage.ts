@@ -6,6 +6,7 @@ import {
   type UserSettings
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { and, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUserSettings(sessionId: string): Promise<UserSettings | undefined>;

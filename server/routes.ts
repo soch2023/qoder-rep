@@ -4,6 +4,10 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import { Request, Response } from "express";
+
+// Session ID validation regex - alphanumeric, 10-50 characters
+const SESSION_ID_REGEX = /^[a-zA-Z0-9]{10,50}$/;
 
 export async function registerRoutes(
   httpServer: Server,
@@ -11,7 +15,13 @@ export async function registerRoutes(
 ): Promise<Server> {
   
   app.get(api.settings.get.path, async (req, res) => {
-    const settings = await storage.getUserSettings(req.params.sessionId);
+    // Validate session ID format to prevent injection attacks
+    const sessionId = req.params.sessionId;
+    if (!SESSION_ID_REGEX.test(sessionId)) {
+      return res.status(400).json({ message: "Invalid session ID format" });
+    }
+    
+    const settings = await storage.getUserSettings(sessionId);
     if (!settings) {
       return res.status(404).json({ message: "Settings not found" });
     }

@@ -1,3 +1,5 @@
+import { MAX_CENTIPAWN_EVAL, EVAL_THRESHOLD_WHITE_ADVANTAGE, EVAL_THRESHOLD_BLACK_ADVANTAGE } from "@/constants/chess";
+
 interface EvaluationBarProps {
   cp: number; // Centipawns (positive = white advantage)
   mate: number | null;
@@ -5,7 +7,6 @@ interface EvaluationBarProps {
 
 export function EvaluationBar({ cp, mate }: EvaluationBarProps) {
   // Normalize CP for visualization (clamp between -500 and 500 usually)
-  const MAX_CP = 800;
   let percent = 50;
 
   if (mate !== null) {
@@ -13,12 +14,12 @@ export function EvaluationBar({ cp, mate }: EvaluationBarProps) {
     percent = mate > 0 ? 100 : 0;
   } else {
     // Sigmoid-like scaling for eval bar
-    const clampedCp = Math.max(-MAX_CP, Math.min(MAX_CP, cp));
-    percent = 50 + (clampedCp / MAX_CP) * 50;
+    const clampedCp = Math.max(-MAX_CENTIPAWN_EVAL, Math.min(MAX_CENTIPAWN_EVAL, cp));
+    percent = 50 + (clampedCp / MAX_CENTIPAWN_EVAL) * 50;
   }
 
   // Ensure bounds
-  percent = Math.max(5, Math.min(95, percent));
+  percent = Math.max(EVAL_THRESHOLD_WHITE_ADVANTAGE, Math.min(EVAL_THRESHOLD_BLACK_ADVANTAGE, percent));
 
   return (
     <div className="h-full w-4 lg:w-6 bg-secondary/50 rounded-md overflow-hidden flex flex-col relative border border-white/5">

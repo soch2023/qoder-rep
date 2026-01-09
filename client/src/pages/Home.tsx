@@ -25,6 +25,7 @@ export default function Home() {
   const [game, setGame] = useState(new Chess());
   const [fen, setFen] = useState(game.fen());
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
+  const [forwardHistory, setForwardHistory] = useState<string[]>([]);
   
   // Modules
   const { settings, updateSettings } = useSettings();
@@ -33,6 +34,7 @@ export default function Home() {
   // AI vs AI State
   const [aiVsAiActive, setAiVsAiActive] = useState(false);
   const [isAIThinking, setIsAIThinking] = useState(false);
+  const [isAIPaused, setIsAIPaused] = useState(false);
   const aiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Validations
@@ -108,13 +110,13 @@ export default function Home() {
       makeAiMove();
     } 
     // 2. Player vs AI Mode
-    else if (settings.gameMode === 'vsAI' && !game.isGameOver() && !isPlayerTurn) {
+    else if (settings.gameMode === 'vsAI' && !game.isGameOver() && !isPlayerTurn && !isAIPaused) {
       const makeAiMove = async () => {
         setIsAIThinking(true);
         await new Promise(r => setTimeout(r, 600)); // 稍长一点的延迟，给悔棋留足制动时间
         
         // 关键防护：确保现在依然是AI回合，且模式没变
-        if (settings.gameMode !== 'vsAI' || game.turn() === settings.playerColor || game.isGameOver()) {
+        if (settings.gameMode !== 'vsAI' || game.turn() === settings.playerColor || game.isGameOver() || isAIPaused) {
           setIsAIThinking(false);
           return;
         }
@@ -122,14 +124,14 @@ export default function Home() {
         const bestMove = await getBestMove(game.fen(), settings.aiDifficulty);
         
         // 再次检查局面，防止计算期间发生了悔棋
-        if (bestMove && settings.gameMode === 'vsAI' && game.turn() !== settings.playerColor) {
+        if (bestMove && settings.gameMode === 'vsAI' && game.turn() !== settings.playerColor && !isAIPaused) {
           safeMove(bestMove);
         }
         setIsAIThinking(false);
       };
       makeAiMove();
     }
-  }, [fen, settings.gameMode, settings.aiDifficulty, settings.whiteAIDifficulty, settings.blackAIDifficulty, settings.playerColor, aiVsAiActive, isPlayerTurn]);
+  }, [fen, settings.gameMode, settings.aiDifficulty, settings.whiteAIDifficulty, settings.blackAIDifficulty, settings.playerColor, aiVsAiActive, isPlayerTurn, game, isAIPaused]);
 
   function safeMove(move: string | { from: string; to: string; promotion?: string }) {
     try {
@@ -167,9 +169,15 @@ export default function Home() {
           setTimeout(() => setFen(newFen), 0);
           setMoveHistory(h => [...h, moveResult.san]);
           
+          // 清空前进历史记录，因为我们在一个新分支上
+          setForwardHistory([]);
+          
           // 重置AI思考状态，确保AI在正确的时机行动
           if (settings.gameMode === 'vsAI') {
-            setIsAIThinking(false);
+            // 只有在AI未被暂停的情况下才重置思考状态
+            if (!isAIPaused) {
+              setIsAIThinking(false);
+            }
           }
           
           return next;
@@ -197,7 +205,10 @@ export default function Home() {
         
         // 重置AI思考状态，确保AI在正确的时机行动
         if (settings.gameMode === 'vsAI') {
-          setIsAIThinking(false);
+          // 只有在AI未被暂停的情况下才重置思考状态
+          if (!isAIPaused) {
+            setIsAIThinking(false);
+          }
         }
         
         return true;
@@ -214,6 +225,7 @@ export default function Home() {
     setGame(newGame);
     setFen(newGame.fen());
     setMoveHistory([]);
+    setForwardHistory([]);
     setAiVsAiActive(false);
   }
 
@@ -281,6 +293,8 @@ export default function Home() {
                   
                   if (moveHistory.length === 0) return;
                   
+                  const lastMove = moveHistory[moveHistory.length - 1]; // 保存最后一步棋
+                  
                   const history = [...moveHistory];
                   history.pop(); // 移除最后一步
                   
@@ -311,8 +325,12 @@ export default function Home() {
                       setFen(newFen);
                       setGame(newGame);
                       
-                      // 重要：在人机对战模式下，悔棋后取消AI的思考状态
+                      // 将撤销的棋步添加到前进历史记录中
+                      setForwardHistory(prev => [...prev, lastMove]);
+                      
+                      // 重要：在人机对战模式下，悔棋后暂停AI
                       if (settings.gameMode === 'vsAI') {
+                        setIsAIPaused(true);
                         setIsAIThinking(false);
                       }
                     } else {
@@ -320,14 +338,21 @@ export default function Home() {
                       // 虽然可能不如历史推演精准，但能防止崩溃
                       const rollbackGame = new Chess(game.fen());
                       if (rollbackGame.history().length > 0) {
+                        const lastMoveFromGame = rollbackGame.history().pop(); // 获取最后一步棋
                         rollbackGame.undo();
                         const rollbackFen = rollbackGame.fen();
                         setGame(rollbackGame);
                         setFen(rollbackFen);
                         setMoveHistory(h => h.slice(0, -1));
                         
-                        // 重要：在人机对战模式下，悔棋后取消AI的思考状态
+                        // 将撤销的棋步添加到前进历史记录中
+                        if (lastMoveFromGame) {
+                          setForwardHistory(prev => [...prev, lastMoveFromGame]);
+                        }
+                        
+                        // 重要：在人机对战模式下，悔棋后暂停AI
                         if (settings.gameMode === 'vsAI') {
+                          setIsAIPaused(true);
                           setIsAIThinking(false);
                         }
                       }
@@ -344,6 +369,51 @@ export default function Home() {
              >
                 <RotateCcw className="w-5 h-5" />
                 <span className="hidden sm:inline">悔棋回退</span>
+             </Button>
+             
+             <Button 
+                variant="ghost" 
+                className="flex gap-2"
+                onClick={() => {
+                  stop(); // 停止AI计算
+                  
+                  if (forwardHistory.length === 0) return;
+                  
+                  // 获取前进历史中的第一步
+                  const nextMove = forwardHistory[0];
+                  
+                  try {
+                    // 从当前局面执行前进的棋步
+                    const newGame = new Chess(game.fen());
+                    const result = newGame.move(nextMove);
+                    
+                    if (result) {
+                      const newFen = newGame.fen();
+                      
+                      // 更新状态
+                      setGame(newGame);
+                      setFen(newFen);
+                      setMoveHistory(h => [...h, result.san]);
+                      
+                      // 从前进历史中移除已经执行的棋步
+                      setForwardHistory(prev => prev.slice(1));
+                      
+                      // 重置AI思考状态，确保AI在正确的时机行动
+                      if (settings.gameMode === 'vsAI') {
+                        // 只有在AI未被暂停的情况下才重置思考状态
+                        if (!isAIPaused) {
+                          setIsAIThinking(false);
+                        }
+                      }
+                    }
+                  } catch (error) {
+                    console.error("Redo operation failed:", error);
+                  }
+                }}
+                disabled={aiVsAiActive || isAIThinking || forwardHistory.length === 0}
+             >
+                <RotateCw className="w-5 h-5 rotate-180" />
+                <span className="hidden sm:inline">恢复前进</span>
              </Button>
 
              <div className="h-8 w-px bg-white/10 mx-2" />
@@ -394,9 +464,29 @@ export default function Home() {
                 </div>
              ) : (
                 <div className="flex items-center gap-4">
+                  {settings.gameMode === 'vsAI' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAIPaused(!isAIPaused)}
+                      className="flex items-center gap-2"
+                    >
+                      {isAIPaused ? (
+                        <>
+                          <Play className="w-4 h-4" />
+                          <span>恢复AI</span>
+                        </>
+                      ) : (
+                        <>
+                          <Pause className="w-4 h-4" />
+                          <span>暂停AI</span>
+                        </>
+                      )}
+                    </Button>
+                  )}
                   <div className="flex items-center gap-2 text-sm text-muted-foreground px-4">
                      {settings.gameMode === 'vsAI' ? <Cpu className="w-4 h-4" /> : <Users className="w-4 h-4" />}
-                     <span>{settings.gameMode === 'vsAI' ? "人机对弈中" : "本地对战模式"}</span>
+                     <span>{settings.gameMode === 'vsAI' ? (isAIPaused ? "AI已暂停" : "人机对弈中") : "本地对战模式"}</span>
                   </div>
                 </div>
              )}

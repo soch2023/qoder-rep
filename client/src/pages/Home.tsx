@@ -166,6 +166,12 @@ export default function Home() {
           // 使用 setTimeout 确保 FEN 更新在下一帧触发，避免渲染竞争
           setTimeout(() => setFen(newFen), 0);
           setMoveHistory(h => [...h, moveResult.san]);
+          
+          // 重置AI思考状态，确保AI在正确的时机行动
+          if (settings.gameMode === 'vsAI') {
+            setIsAIThinking(false);
+          }
+          
           return next;
         }
         return prev;
@@ -188,6 +194,12 @@ export default function Home() {
         setGame(next);
         setFen(next.fen());
         setMoveHistory(h => [...h, result.san]);
+        
+        // 重置AI思考状态，确保AI在正确的时机行动
+        if (settings.gameMode === 'vsAI') {
+          setIsAIThinking(false);
+        }
+        
         return true;
       }
     } catch (error) {
@@ -298,6 +310,11 @@ export default function Home() {
                       setMoveHistory(history);
                       setFen(newFen);
                       setGame(newGame);
+                      
+                      // 重要：在人机对战模式下，悔棋后取消AI的思考状态
+                      if (settings.gameMode === 'vsAI') {
+                        setIsAIThinking(false);
+                      }
                     } else {
                       // 如果历史记录推演失败，作为保底方案：使用 chess.js 自带的 undo
                       // 虽然可能不如历史推演精准，但能防止崩溃
@@ -308,6 +325,11 @@ export default function Home() {
                         setGame(rollbackGame);
                         setFen(rollbackFen);
                         setMoveHistory(h => h.slice(0, -1));
+                        
+                        // 重要：在人机对战模式下，悔棋后取消AI的思考状态
+                        if (settings.gameMode === 'vsAI') {
+                          setIsAIThinking(false);
+                        }
                       }
                     }
                   } catch (error) {
